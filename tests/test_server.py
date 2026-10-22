@@ -160,4 +160,11 @@ class SchemaMigration(unittest.TestCase):
    self.assertIn('exercise_order',columns)
   server.DATA=original
 
+class HostingConfiguration(unittest.TestCase):
+ def test_render_hostname_becomes_public_https_url(self):
+  os.environ.pop('FORMA_PUBLIC_URL',None)
+  os.environ['RENDER_EXTERNAL_HOSTNAME']='forma-preview.onrender.com'
+  try: self.assertEqual(server.public_url(),'https://forma-preview.onrender.com')
+  finally: os.environ.pop('RENDER_EXTERNAL_HOSTNAME',None)
+
 if __name__=='__main__': unittest.main()

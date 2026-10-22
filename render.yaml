@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: forma-whan3x
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: FORMA_ENV
+        value: production
+      - key: FORMA_HOST
+        value: 0.0.0.0
+      - key: FORMA_DATA
+        value: /data
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"

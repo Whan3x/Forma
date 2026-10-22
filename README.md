@@ -2,6 +2,10 @@
 
 Mobilní PWA pro trénink, výživu, progres a přátele. Běží na Pythonu 3.9+, SQLite a čistém JavaScriptu bez balíčků třetích stran.
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Whan3x/Forma)
+
+Tlačítko vytvoří veřejný HTTPS náhled z `render.yaml`. Bez placeného persistentního disku je bezplatná varianta vhodná jen k prohlížení a testování — data se mohou při restartu nebo novém nasazení ztratit.
+
 ## Co je nové ve 2.0
 
 - Samostatná sekce **Plány** s rotací priorit Upper (`záda → hrudník → ramena`) a Lower (`kvadricepsy → zadní řetězec`).
@@ -74,6 +78,7 @@ Proměnné jsou popsané v `.env.example`. Soubor `.env` se záměrně nenačít
 | `PORT` | port | `8765` |
 | `FORMA_ENV` | při `production` vyžaduje HTTPS veřejnou URL | prázdná |
 | `FORMA_PUBLIC_URL` | veřejná HTTPS adresa a kontrola Origin | prázdná |
+| `RENDER_EXTERNAL_HOSTNAME` | automatická veřejná doména Renderu | nastavuje Render |
 | `OPENAI_API_KEY` | volitelná serverová AI analýza | prázdná |
 | `OPENAI_MODEL` | obrazový model | `gpt-4.1-mini` |
 | `FORMA_AI_DAILY_LIMIT` | AI volání na účet za UTC den | `10` |
@@ -92,6 +97,14 @@ docker run -d --name forma \
 ```
 
 Produkce potřebuje HTTPS reverse proxy, trvalý disk `/data`, pravidelné SQLite zálohy a limit požadavků na proxy. Současná databázová vrstva je určená pro jednu instanci aplikace.
+
+### Nejrychlejší HTTPS náhled na Renderu
+
+1. Klepni na tlačítko **Deploy to Render** nahoře.
+2. Přihlas se přes GitHub a potvrď Blueprint.
+3. Po dokončení buildu otevři URL končící `.onrender.com`.
+
+Render předá aplikaci svou doménu přes `RENDER_EXTERNAL_HOSTNAME`, takže bezpečné cookies, HSTS a kontrola Origin se zapnou automaticky. Pro dlouhodobé používání změň plán na variantu s persistentním diskem připojeným na `/data`.
 
 ## Zabezpečení a soukromí
 

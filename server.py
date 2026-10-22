@@ -89,6 +89,13 @@ def initialize():
   if 'priority' not in columns: con.execute("ALTER TABLE workouts ADD COLUMN priority TEXT NOT NULL DEFAULT 'original'")
   if 'exercise_order' not in columns: con.execute("ALTER TABLE workouts ADD COLUMN exercise_order TEXT NOT NULL DEFAULT '[]'")
 
+def public_url():
+ configured=os.environ.get('FORMA_PUBLIC_URL','').rstrip('/')
+ if configured: return configured
+ host=os.environ.get('RENDER_EXTERNAL_HOSTNAME','').strip().lower()
+ if host and len(host)<=253 and re.fullmatch(r'[a-z0-9.-]+',host): return 'https://'+host
+ return ''
+
 def uid(): return str(uuid.uuid4())
 def now(): return int(time.time())
 def rows(con,sql,args=()): return [dict(x) for x in con.execute(sql,args).fetchall()]
@@ -151,7 +158,7 @@ class Handler(BaseHTTPRequestHandler):
   self.send_header('Permissions-Policy','camera=(self), microphone=(), geolocation=()')
   self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://images.openfoodfacts.org; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
   self.send_header('Cache-Control','no-store' if self.path.startswith('/api/') else 'no-cache')
-  if os.environ.get('FORMA_PUBLIC_URL','').startswith('https://'): self.send_header('Strict-Transport-Security','max-age=31536000')
+  if public_url().startswith('https://'): self.send_header('Strict-Transport-Security','max-age=31536000')
   for k,v in (headers or {}).items(): self.send_header(k,v)
   self.end_headers(); self.wfile.write(raw)
  def json_body(self):
@@ -169,7 +176,7 @@ class Handler(BaseHTTPRequestHandler):
   except Exception: token=''
   return con.execute('SELECT u.* FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token=? AND s.expires>?',(hashlib.sha256(token.encode()).hexdigest(),now())).fetchone()
  def cookie(self,token,age=2592000):
-  secure='; Secure' if os.environ.get('FORMA_PUBLIC_URL','').startswith('https://') else ''
+  secure='; Secure' if public_url().startswith('https://') else ''
   return 'forma_session='+token+'; Path=/; HttpOnly; SameSite=Lax; Max-Age='+str(age)+secure
  def auth_cookie(self,con,user):
   token=secrets.token_urlsafe(32)
@@ -178,7 +185,7 @@ class Handler(BaseHTTPRequestHandler):
   return {'Set-Cookie':self.cookie(token)}
  def origin_check(self):
   origin=self.headers.get('Origin')
-  allowed=os.environ.get('FORMA_PUBLIC_URL','').rstrip('/')
+  allowed=public_url()
   host=self.headers.get('Host','')
   valid=(allowed,) if allowed else ('http://'+host,'https://'+host)
   if origin and origin not in valid: raise UserError('Požadavek z jiné stránky byl odmítnut.',403)
@@ -431,8 +438,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
  initialize(); port=int(os.environ.get('PORT','8765')); host=os.environ.get('FORMA_HOST','127.0.0.1')
- if os.environ.get('FORMA_ENV')=='production' and not os.environ.get('FORMA_PUBLIC_URL','').startswith('https://'):
-  raise SystemExit('FORMA_PUBLIC_URL must be the HTTPS public address in production.')
+ if os.environ.get('FORMA_ENV')=='production' and not public_url().startswith('https://'):
+  raise SystemExit('FORMA_PUBLIC_URL or RENDER_EXTERNAL_HOSTNAME must identify the HTTPS public address in production.')
  print('FORMA: http://%s:%s — data: %s'%(host,port,DATA),flush=True)
  ThreadingHTTPServer((host,port),Handler).serve_forever()
 
