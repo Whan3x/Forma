@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { nextPriority, orderExercises, priorityLabel, priorityOptions } from '../public/planner.js';
+import planner from '../public/planner.js';
+
+const { nextPriority, orderExercises, priorityLabel, priorityOptions } = planner;
 
 const exercise = (id, name, plan) => ({ id, name, plan });
 

@@ -1,5 +1,5 @@
-const VERSION='forma-shell-v1';
-const FILES=['/','/index.html','/style.css','/app.js','/icon.svg','/icon-192.png','/icon-512.png','/manifest.webmanifest'];
+const VERSION='forma-shell-v2';
+const FILES=['/','/index.html','/style.css','/planner.js','/app.js','/icon.svg','/icon-192.png','/icon-512.png','/manifest.webmanifest'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(VERSION).then(c=>c.addAll(FILES))));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==VERSION).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{

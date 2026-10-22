@@ -1,1 +1,41 @@
-<!doctype html><html lang="cs"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FORMA — spuštění a instalace</title><style>body{margin:0;background:#101713;color:#f0f5eb;font:16px/1.75 -apple-system,BlinkMacSystemFont,sans-serif}main{max-width:780px;margin:auto;padding:45px 24px}h1{font-size:50px;letter-spacing:-2px;color:#b8f27b;margin:0}h2{margin-top:32px;line-height:1.3}p,li{color:#b9c9b7}b{color:#f0f5eb}code{background:#263422;padding:5px 8px;border-radius:6px;color:#b8f27b}aside{background:#263422;border:1px solid #526b40;padding:18px 22px;border-radius:16px;margin:25px 0}a{color:#b8f27b}small{color:#a1b29e}</style><main><h1>FORMA ↗</h1><p>Tvůj trénink, tvoje výživa, tvoje parta.</p><aside><b>Důležité:</b> veřejné nasazení v tomto prostředí nebylo povolené. Balíček obsahuje spustitelný základ aplikace a konfiguraci nasazení. Veřejný odkaz, Google/Apple přihlášení a aktivní AI zatím nejsou součástí dodávky.</aside><h2>Spuštění na Macu</h2><ol><li>Rozbal ZIP a otevři složku <b>forma</b>.</li><li>Spusť <b>START.command</b>. Potřebuješ Python 3.9 nebo novější.</li><li>Pokud soubor nejde spustit, otevři Terminál v této složce a zadej <code>python3 server.py</code>.</li><li>V prohlížeči otevři <b>http://127.0.0.1:8765</b>.</li><li>Vytvoř si účet a zvol <b>Načíst Upper / Lower</b>. Výchozí váhy si uprav podle sebe.</li></ol><p>Okno serveru musí zůstat otevřené. Tvoje data jsou ve složce <b>data</b>. Tu nemaž. Ukončení serveru: Ctrl+C.</p><h2>Jak začít cvičit</h2><p><b>Trénink → Upper / Lower → Začít trénink → plus u cviku.</b> Uprav kg a opakování, ulož sérii a odpočívej. Název cviku otevře jeho historii a graf. Nakonec klepni na Dokončit.</p><h2>iPhone: ikona na ploše</h2><p>Nejdřív je nutné aplikaci nasadit na <b>veřejnou HTTPS adresu</b>. Samotný ZIP ani adresa localhost na iPhonu nestačí.</p><ol><li>Otevři veřejnou adresu v <b>Safari</b>.</li><li>Klepni na <b>Sdílet</b> — čtvereček se šipkou nahoru, podle verze iOS v nabídce dalších možností.</li><li>Vyber <b>Přidat na plochu</b>.</li><li>Pokud se objeví <b>Otevřít jako webovou aplikaci</b>, ponech zapnuté.</li><li>Potvrď <b>Přidat</b>. Na ploše se objeví FORMA.</li></ol><p>Android: Chrome → ⋮ → Přidat na plochu / Nainstalovat aplikaci.</p><h2>Kamarádi a soukromí</h2><p>Kamarádi musí mít účty na stejném serveru. V záložce <b>Parta</b> vytvoř pozvánku. Tréninky jsou soukromé, dokud v Profilu nepovolíš sdílení a konkrétní trénink sám nenasdílíš. Jídla a fotky postavy jsou vždy soukromé.</p><h2>Fotografie jídla</h2><p>Fotografie a ruční zápis fungují. Automatický odhad vyžaduje vlastní připojení AI na serveru, které ještě není aktivní. Databáze potravin potřebuje internet. Hodnoty můžeš vždy zkontrolovat a upravit před uložením.</p><h2>Co ještě zbývá</h2><p>Veřejný hosting s HTTPS, ověření e-mailu a obnova hesla, Google a Apple přihlášení, napojení AI, skutečný test na iPhonu/Androidu a test většího provozu. Oznámení při zavřené aplikaci nejsou implementovaná.</p><p>Technický návod pro nasazení, zálohy a přesný stav funkcí je v souboru <b>README.md</b>.</p><small>FORMA 1.0 · Funkční základ s testy. Vizuální ověření prohlížeče a veřejné nasazení nebyly v tomto prostředí možné.</small></main></html>
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FORMA 2.0 — rychlý návod</title>
+<style>
+body{margin:0;background:#07100b;color:#f3f8f4;font:16px/1.7 -apple-system,BlinkMacSystemFont,sans-serif}main{max-width:780px;margin:auto;padding:45px 24px}h1{margin:0;color:#5df58b;font-size:50px;letter-spacing:-2px}h2{margin-top:34px;line-height:1.3}p,li{color:#b9c9bd}b{color:#f3f8f4}code{padding:5px 8px;border-radius:7px;background:#193021;color:#5df58b}aside{margin:25px 0;padding:18px 22px;border:1px solid #31573c;border-radius:16px;background:#122218}small{color:#9aaca0}
+</style>
+<main>
+  <h1>FORMA ↗</h1>
+  <p>Tvůj trénink, výživa, progres a parta.</p>
+  <aside><b>FORMA 2.0:</b> stará databáze se při prvním startu bezpečně doplní o plánování. Účty a záznamy z verze 1.0 zůstávají zachované.</aside>
+
+  <h2>Spuštění na Macu</h2>
+  <ol>
+    <li>Otevři složku projektu a spusť <b>START.command</b>.</li>
+    <li>Pokud se neotevře, spusť v Terminálu <code>python3 server.py</code>.</li>
+    <li>V prohlížeči otevři <b>http://127.0.0.1:8765</b>.</li>
+    <li>Vytvoř účet a zvol <b>Načíst Upper / Lower</b>.</li>
+  </ol>
+  <p>Server ukončíš pomocí Ctrl+C. Data jsou ve složce <b>data</b>; pravidelně ji zálohuj.</p>
+
+  <h2>Plán a trénink</h2>
+  <p><b>Plány → Upper / Lower → vyber prioritu → Otevřít trénink → Začít trénink.</b> Priorita střídá hlavní zaměření a pořadí se při startu uloží. V rozpracovaném tréninku se už samo nezmění.</p>
+  <p>Plus u cviku otevře rychlý zápis série. Název cviku otevře historii a graf. Nakonec klepni na <b>Dokončit</b>.</p>
+
+  <h2>iPhone a Android</h2>
+  <p>Telefon potřebuje veřejnou HTTPS adresu; localhost na Macu na telefonu nefunguje.</p>
+  <ul>
+    <li>iPhone: Safari → Sdílet → <b>Přidat na plochu</b>.</li>
+    <li>Android: Chrome → ⋮ → <b>Nainstalovat aplikaci</b> / Přidat na plochu.</li>
+  </ul>
+
+  <h2>Soukromí a chybějící služby</h2>
+  <p>Tréninky jsou soukromé, dokud nezapneš sdílení a konkrétní trénink nezveřejníš. Jídla, tělesné míry a fotografie progresu se do feedu neposílají.</p>
+  <p>Google/Apple přihlášení, obnova hesla, ověření e-mailu a push notifikace zatím nejsou implementované. AI analýza jídla vyžaduje vlastní serverový API klíč.</p>
+
+  <p>Technické spuštění, testy, Docker a přesný stav jsou v <b>README.md</b>.</p>
+  <small>FORMA 2.0 · před veřejným nasazením ověř na skutečném iPhonu i Androidu.</small>
+</main>
+</html>

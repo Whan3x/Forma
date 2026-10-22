@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,expires INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS rate_limits(key TEXT PRIMARY KEY,count INTEGER NOT NULL,expires INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS exercises(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,name TEXT NOT NULL,plan TEXT NOT NULL,weight REAL NOT NULL,reps INTEGER NOT NULL,extra REAL NOT NULL DEFAULT 0,mode TEXT NOT NULL,note TEXT NOT NULL,step REAL NOT NULL DEFAULT 2.5);
-CREATE TABLE IF NOT EXISTS workouts(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,name TEXT NOT NULL,started INTEGER NOT NULL,ended INTEGER,shared INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS workouts(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,name TEXT NOT NULL,started INTEGER NOT NULL,ended INTEGER,shared INTEGER NOT NULL DEFAULT 0,priority TEXT NOT NULL DEFAULT 'original',exercise_order TEXT NOT NULL DEFAULT '[]');
 CREATE TABLE IF NOT EXISTS sets(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,workout_id TEXT NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,exercise_id TEXT NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,weight REAL NOT NULL,extra REAL NOT NULL,reps INTEGER NOT NULL,rpe REAL,note TEXT NOT NULL,created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS meals(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,day TEXT NOT NULL,name TEXT NOT NULL,kcal REAL NOT NULL,protein REAL NOT NULL,carbs REAL NOT NULL,fat REAL NOT NULL,photo_id TEXT,note TEXT NOT NULL,favorite INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS photos(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,kind TEXT NOT NULL,mime TEXT NOT NULL,bytes BLOB NOT NULL,created INTEGER NOT NULL);
@@ -83,11 +83,22 @@ def db():
 
 def initialize():
  DATA.mkdir(parents=True,exist_ok=True)
- with db() as con: con.executescript(SCHEMA)
+ with db() as con:
+  con.executescript(SCHEMA)
+  columns={row['name'] for row in con.execute('PRAGMA table_info(workouts)')}
+  if 'priority' not in columns: con.execute("ALTER TABLE workouts ADD COLUMN priority TEXT NOT NULL DEFAULT 'original'")
+  if 'exercise_order' not in columns: con.execute("ALTER TABLE workouts ADD COLUMN exercise_order TEXT NOT NULL DEFAULT '[]'")
 
 def uid(): return str(uuid.uuid4())
 def now(): return int(time.time())
 def rows(con,sql,args=()): return [dict(x) for x in con.execute(sql,args).fetchall()]
+def workout_dict(row):
+ result=dict(row)
+ try: order=json.loads(result.get('exercise_order','[]'))
+ except (TypeError,json.JSONDecodeError): order=[]
+ result['exercise_order']=order if isinstance(order,list) else []
+ result['priority']=result.get('priority') or 'original'
+ return result
 def textval(v,n=200):
  if not isinstance(v,str) or len(v)>n: raise UserError('Neplatný text nebo příliš dlouhý vstup.')
  return v.strip()
@@ -116,7 +127,7 @@ def rate(con,key,limit,window):
 
 def remote_json(url,payload=None,headers=None,timeout=15):
  body=json.dumps(payload).encode() if payload is not None else None
- req=urllib.request.Request(url,data=body,headers=headers or {'User-Agent':'FORMA/1.0 (personal fitness diary)'})
+ req=urllib.request.Request(url,data=body,headers=headers or {'User-Agent':'FORMA/2.0 (personal fitness diary)'})
  with urllib.request.urlopen(req,timeout=timeout) as res:
   raw=res.read(4_000_001)
   if len(raw)>4_000_000: raise UserError('Odpověď služby je příliš velká.',502)
@@ -133,9 +144,12 @@ class Handler(BaseHTTPRequestHandler):
   self.send_header('Content-Type',ctype)
   self.send_header('Content-Length',str(len(raw)))
   self.send_header('X-Content-Type-Options','nosniff')
+  self.send_header('X-Frame-Options','DENY')
   self.send_header('Referrer-Policy','same-origin')
+  self.send_header('Cross-Origin-Opener-Policy','same-origin')
+  self.send_header('Cross-Origin-Resource-Policy','same-origin')
   self.send_header('Permissions-Policy','camera=(self), microphone=(), geolocation=()')
-  self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://images.openfoodfacts.org; connect-src 'self'; font-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'")
+  self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://images.openfoodfacts.org; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
   self.send_header('Cache-Control','no-store' if self.path.startswith('/api/') else 'no-cache')
   if os.environ.get('FORMA_PUBLIC_URL','').startswith('https://'): self.send_header('Strict-Transport-Security','max-age=31536000')
   for k,v in (headers or {}).items(): self.send_header(k,v)
@@ -166,7 +180,8 @@ class Handler(BaseHTTPRequestHandler):
   origin=self.headers.get('Origin')
   allowed=os.environ.get('FORMA_PUBLIC_URL','').rstrip('/')
   host=self.headers.get('Host','')
-  if origin and origin not in (allowed,'http://'+host,'https://'+host): raise UserError('Požadavek z jiné stránky byl odmítnut.',403)
+  valid=(allowed,) if allowed else ('http://'+host,'https://'+host)
+  if origin and origin not in valid: raise UserError('Požadavek z jiné stránky byl odmítnut.',403)
   if self.headers.get('Sec-Fetch-Site')=='cross-site': raise UserError('Požadavek z jiné stránky byl odmítnut.',403)
  def do_GET(self): self.dispatch('GET')
  def do_POST(self): self.dispatch('POST')
@@ -182,7 +197,7 @@ class Handler(BaseHTTPRequestHandler):
     return self.send(file.read_bytes(),ctype=mimetypes.guess_type(str(file))[0] or 'application/octet-stream')
    with db() as con:
     if path=='/api/health': return self.send({'ok':True})
-    if path=='/api/config': return self.send({'ai':bool(os.environ.get('OPENAI_API_KEY')),'google':False,'apple':False,'version':'1.0.0','aiDailyLimit':int(os.environ.get('FORMA_AI_DAILY_LIMIT','10'))})
+    if path=='/api/config': return self.send({'ai':bool(os.environ.get('OPENAI_API_KEY')),'google':False,'apple':False,'version':'2.0.0','aiDailyLimit':int(os.environ.get('FORMA_AI_DAILY_LIMIT','10'))})
     if path in ('/api/register','/api/login') and method=='POST':
      rate(con,'auth:'+self.client_address[0],20,900)
      d=self.json_body(); email=textval(d.get('email','')).lower(); p=textval(d.get('password',''),128)
@@ -224,10 +239,21 @@ class Handler(BaseHTTPRequestHandler):
      else: con.execute('INSERT INTO exercises VALUES(?,?,?,?,?,?,?,?,?,?)',(exercise,user)+values)
     elif path=='/api/workout':
      wid=idval(d.get('id') or uid()); name=textval(d.get('name','Trénink'),80)
-     con.execute('INSERT INTO workouts(id,user_id,name,started) VALUES(?,?,?,?) ON CONFLICT(id) DO NOTHING',(wid,user,name,now()))
+     priority=textval(d.get('priority','original'),20) or 'original'
+     allowed={'upper':{'original','back','chest','shoulders'},'lower':{'original','quads','posterior'}}.get(name.lower(),{'original'})
+     if priority not in allowed: raise UserError('Neplatná priorita tréninku.')
+     order=d.get('exercise_order',[])
+     if not isinstance(order,list) or len(order)>200: raise UserError('Neplatné pořadí cviků.')
+     order=[idval(item) for item in order]
+     if len(order)!=len(set(order)): raise UserError('Pořadí cviků obsahuje duplicity.')
+     for exercise_id in order:
+      owned=con.execute('SELECT plan FROM exercises WHERE id=? AND user_id=?',(exercise_id,user)).fetchone()
+      if not owned: raise UserError('Cvik nenalezen.',404)
+      if owned['plan']!=name: raise UserError('Cvik nepatří do zvoleného plánu.')
+     con.execute('INSERT INTO workouts(id,user_id,name,started,priority,exercise_order) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING',(wid,user,name,now(),priority,json.dumps(order)))
      row=con.execute('SELECT * FROM workouts WHERE id=? AND user_id=?',(wid,user)).fetchone()
      if not row: raise UserError('Trénink nenalezen.',404)
-     con.commit(); return self.send(dict(row))
+     con.commit(); return self.send(workout_dict(row))
     elif path=='/api/set':
      wid=idval(d.get('workout_id')); eid=idval(d.get('exercise_id')); sid=idval(d.get('id'))
      existing=con.execute('SELECT user_id FROM sets WHERE id=?',(sid,)).fetchone()
@@ -323,6 +349,7 @@ class Handler(BaseHTTPRequestHandler):
   user=u['id']; query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
   if path in ('/api/state','/api/export'):
    result={'user':{'id':user,'name':u['name'],'email':u['email'],'code':u['code'],'settings':{**DEFAULTS,**json.loads(u['settings'])}},'exercises':rows(con,'SELECT * FROM exercises WHERE user_id=? ORDER BY rowid',(user,)),'workouts':rows(con,'SELECT * FROM workouts WHERE user_id=? ORDER BY started DESC',(user,)),'sets':rows(con,'SELECT * FROM sets WHERE user_id=? ORDER BY created DESC,rowid DESC',(user,)),'meals':rows(con,'SELECT * FROM meals WHERE user_id=? ORDER BY created DESC,rowid DESC',(user,)),'metrics':rows(con,'SELECT * FROM metrics WHERE user_id=? ORDER BY day, rowid',(user,)),'water':rows(con,'SELECT day,ml FROM water WHERE user_id=?',(user,))}
+   result['workouts']=[workout_dict(workout) for workout in result['workouts']]
    return self.send(result,headers={'Content-Disposition':'attachment; filename="forma-export.json"'} if path.endswith('export') else None)
   if path.startswith('/api/photo/'):
    row=con.execute('SELECT mime,bytes FROM photos WHERE id=? AND user_id=?',(path.rsplit('/',1)[1],user)).fetchone()

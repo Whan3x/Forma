@@ -35,12 +35,12 @@ class FrontendLogic(unittest.TestCase):
    return self.string(value,ctx)
   finally:self.js.JSGlobalContextRelease(ctx)
  def test_script_syntax(self):
-  for filename in ('app.js','sw.js'):
+  for filename in ('planner.js','app.js','sw.js'):
    ctx=self.js.JSGlobalContextCreate(None);ref=self.js.JSStringCreateWithUTF8CString((self.public/filename).read_bytes());err=ctypes.c_void_p()
    self.assertTrue(self.js.JSCheckScriptSyntax(ctx,ref,None,1,ctypes.byref(err)),filename)
    self.js.JSStringRelease(ref);self.js.JSGlobalContextRelease(ctx)
  def test_rendering_and_owned_offline_queue(self):
-  source=(self.public/'app.js').read_text().rsplit('(async()=>{',1)[0]
+  source=(self.public/'planner.js').read_text()+'\n'+(self.public/'app.js').read_text().rsplit('(async()=>{',1)[0]
   harness="""
 const fakeNode={innerHTML:'',textContent:'',classList:{add(){},remove(){}},querySelector(){return null;}};
 const document={querySelector(){return fakeNode;},querySelectorAll(){return [];},addEventListener(){}};

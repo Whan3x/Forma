@@ -1,0 +1,32 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Python integration tests
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+      - name: JavaScript syntax and planner tests
+        run: |
+          node --check public/planner.js
+          node --check public/app.js
+          node --check public/sw.js
+          node tests/test_planner.mjs
+          node tests/test_frontend_node.mjs
+      - name: Python syntax
+        run: python3 -m py_compile server.py

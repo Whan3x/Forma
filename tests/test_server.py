@@ -108,6 +108,11 @@ class FormaIntegration(unittest.TestCase):
   self.assertEqual(self.req(a,'settings',{'kcal':float('nan')})[0],400)
   self.assertEqual(self.req(a,'water',{'day':'not-a-date','ml':250})[0],400)
   self.assertEqual(self.req(a,'settings',{'share':True},{'Origin':'https://evil.example'})[0],403)
+  os.environ['FORMA_PUBLIC_URL']='https://forma.example'
+  try:
+   self.assertEqual(self.req(a,'settings',{'share':True},{'Origin':'http://127.0.0.1:8765'})[0],403)
+   self.assertEqual(self.req(a,'settings',{'share':True},{'Origin':'https://forma.example'})[0],200)
+  finally: os.environ.pop('FORMA_PUBLIC_URL',None)
   self.assertEqual(self.req(a,'exercise',{'name':"Bench '); DROP TABLE users;--",'plan':'Test'})[0],200)
   self.assertEqual(self.req(a,'state')[0],200)
   self.assertEqual(self.req(a,'analyze',{'photo_id':str(uuid.uuid4())})[0],503)
