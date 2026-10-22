@@ -116,6 +116,15 @@ class FormaIntegration(unittest.TestCase):
   self.assertEqual(self.req(a,'exercise',{'name':"Bench '); DROP TABLE users;--",'plan':'Test'})[0],200)
   self.assertEqual(self.req(a,'state')[0],200)
   self.assertEqual(self.req(a,'analyze',{'photo_id':str(uuid.uuid4())})[0],503)
+ def test_registration_can_be_capped_for_free_hosting(self):
+  with server.db() as con: current=con.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+  os.environ['FORMA_MAX_ACCOUNTS']=str(current+1)
+  try:
+   self.assertEqual(self.account('Poslední účet').cookie.startswith('forma_session='),True)
+   status,body=self.req(self.client(),'register',{'email':str(uuid.uuid4())+'@example.cz','password':'correct-horse-battery','name':'Navíc'})
+   self.assertEqual(status,503)
+   self.assertIn('uzavřená',body['error'])
+  finally: os.environ.pop('FORMA_MAX_ACCOUNTS',None)
  def test_workout_priority_and_exercise_order_are_owned_and_persisted(self):
   a,b=self.account('Plánovač'),self.account('Cizí plán')
   self.assertEqual(self.req(a,'template',{})[0],200)
@@ -166,5 +175,12 @@ class HostingConfiguration(unittest.TestCase):
   os.environ['RENDER_EXTERNAL_HOSTNAME']='forma-preview.onrender.com'
   try: self.assertEqual(server.public_url(),'https://forma-preview.onrender.com')
   finally: os.environ.pop('RENDER_EXTERNAL_HOSTNAME',None)
+ def test_render_blueprint_is_free_and_has_no_billable_addons(self):
+  blueprint=(Path(__file__).resolve().parents[1]/'render.yaml').read_text()
+  self.assertIn('plan: free',blueprint)
+  self.assertIn('autoDeploy: false',blueprint)
+  self.assertNotIn('disk:',blueprint)
+  self.assertNotIn('databases:',blueprint)
+  self.assertNotIn('OPENAI_API_KEY',blueprint)
 
 if __name__=='__main__': unittest.main()

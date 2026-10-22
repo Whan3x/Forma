@@ -4,7 +4,8 @@ services:
     runtime: docker
     plan: free
     healthCheckPath: /api/health
-    autoDeploy: true
+    # Manual deploys avoid consuming build capacity on every Git push.
+    autoDeploy: false
     envVars:
       - key: FORMA_ENV
         value: production
@@ -12,5 +13,17 @@ services:
         value: 0.0.0.0
       - key: FORMA_DATA
         value: /data
+      # Cost-safety limits for the public free preview. No paid disk is attached.
+      - key: FORMA_MAX_ACCOUNTS
+        value: "25"
+      - key: FORMA_MAX_PHOTO_MB_PER_ACCOUNT
+        value: "25"
+      - key: FORMA_MAX_TOTAL_PHOTO_MB
+        value: "250"
+      - key: FORMA_WRITE_RATE_PER_MINUTE
+        value: "60"
+      # Keep paid OpenAI calls disabled even if a key is later added accidentally.
+      - key: FORMA_AI_DAILY_LIMIT
+        value: "0"
       - key: PYTHONDONTWRITEBYTECODE
         value: "1"

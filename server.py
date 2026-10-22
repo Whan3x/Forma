@@ -98,6 +98,10 @@ def public_url():
 
 def uid(): return str(uuid.uuid4())
 def now(): return int(time.time())
+def env_int(name,default,minimum=0,maximum=1_000_000):
+ try: value=int(os.environ.get(name,str(default)))
+ except ValueError: return default
+ return value if minimum<=value<=maximum else default
 def rows(con,sql,args=()): return [dict(x) for x in con.execute(sql,args).fetchall()]
 def workout_dict(row):
  result=dict(row)
@@ -204,7 +208,7 @@ class Handler(BaseHTTPRequestHandler):
     return self.send(file.read_bytes(),ctype=mimetypes.guess_type(str(file))[0] or 'application/octet-stream')
    with db() as con:
     if path=='/api/health': return self.send({'ok':True})
-    if path=='/api/config': return self.send({'ai':bool(os.environ.get('OPENAI_API_KEY')),'google':False,'apple':False,'version':'2.0.0','aiDailyLimit':int(os.environ.get('FORMA_AI_DAILY_LIMIT','10'))})
+    if path=='/api/config': return self.send({'ai':bool(os.environ.get('OPENAI_API_KEY')) and env_int('FORMA_AI_DAILY_LIMIT',10)>0,'google':False,'apple':False,'version':'2.0.0','aiDailyLimit':env_int('FORMA_AI_DAILY_LIMIT',10)})
     if path in ('/api/register','/api/login') and method=='POST':
      rate(con,'auth:'+self.client_address[0],20,900)
      d=self.json_body(); email=textval(d.get('email','')).lower(); p=textval(d.get('password',''),128)
@@ -214,6 +218,8 @@ class Handler(BaseHTTPRequestHandler):
       name=textval(d.get('name',''),50)
       if not name: raise UserError('Vyplň přezdívku.')
       if con.execute('SELECT 1 FROM users WHERE email=?',(email,)).fetchone(): raise UserError('Účet nelze vytvořit. Zkus přihlášení.',409)
+      account_limit=env_int('FORMA_MAX_ACCOUNTS',0)
+      if account_limit and con.execute('SELECT COUNT(*) FROM users').fetchone()[0]>=account_limit: raise UserError('Registrace je dočasně uzavřená.',503)
       user=uid(); con.execute('INSERT INTO users VALUES(?,?,?,?,?,?,?)',(user,email,name,password_hash(p),secrets.token_urlsafe(10),json.dumps(DEFAULTS),now()))
      else:
       row=con.execute('SELECT * FROM users WHERE email=?',(email,)).fetchone()
@@ -225,7 +231,7 @@ class Handler(BaseHTTPRequestHandler):
     u=self.session(con)
     if not u: raise UserError('Přihlas se pro přístup ke svým datům.',401)
     user=u['id']
-    if method=='POST': rate(con,'write:'+user,240,60)
+    if method=='POST': rate(con,'write:'+user,env_int('FORMA_WRITE_RATE_PER_MINUTE',240,1),60)
     if method=='GET': return self.get_api(con,u,path)
     d={} if path in ('/api/photo','/api/analyze') else self.json_body()
     if path=='/api/logout':
@@ -415,13 +421,18 @@ class Handler(BaseHTTPRequestHandler):
   elif blob.startswith(b'\x89PNG\r\n\x1a\n'): mime='image/png'
   elif blob[:4]==b'RIFF' and blob[8:12]==b'WEBP': mime='image/webp'
   else: raise UserError('Použij JPG, PNG nebo WebP.')
-  if con.execute('SELECT COALESCE(SUM(length(bytes)),0) FROM photos WHERE user_id=?',(user,)).fetchone()[0]+len(blob)>100_000_000: raise UserError('Limit fotografií účtu je 100 MB. Smaž nepotřebné fotografie.')
+  user_limit=env_int('FORMA_MAX_PHOTO_MB_PER_ACCOUNT',100)*1_000_000
+  total_limit=env_int('FORMA_MAX_TOTAL_PHOTO_MB',0)*1_000_000
+  if user_limit and con.execute('SELECT COALESCE(SUM(length(bytes)),0) FROM photos WHERE user_id=?',(user,)).fetchone()[0]+len(blob)>user_limit: raise UserError('Limit fotografií účtu byl vyčerpán. Smaž nepotřebné fotografie.',413)
+  if total_limit and con.execute('SELECT COALESCE(SUM(length(bytes)),0) FROM photos').fetchone()[0]+len(blob)>total_limit: raise UserError('Úložiště aplikace je zaplněné. Zkus to později.',503)
   photo=uid(); con.execute('INSERT INTO photos VALUES(?,?,?,?,?,?)',(photo,user,kind,mime,blob,now())); con.commit(); return self.send({'id':photo})
 
  def analyze(self,con,user):
   d=self.json_body(); key=os.environ.get('OPENAI_API_KEY')
   if not key: raise UserError('AI rozpoznávání zatím není připojené. Vyplň hodnoty ručně nebo vyber potravinu z databáze.',503)
-  rate(con,'ai:'+user,int(os.environ.get('FORMA_AI_DAILY_LIMIT','10')),86400)
+  ai_limit=env_int('FORMA_AI_DAILY_LIMIT',10)
+  if not ai_limit: raise UserError('AI rozpoznávání je vypnuté.',503)
+  rate(con,'ai:'+user,ai_limit,86400)
   photo=con.execute('SELECT * FROM photos WHERE id=? AND user_id=?',(idval(d.get('photo_id')),user)).fetchone()
   if not photo: raise UserError('Fotografie nenalezena.',404)
   description=textval(d.get('description',''),600)

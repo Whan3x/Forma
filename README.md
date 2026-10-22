@@ -82,6 +82,10 @@ Proměnné jsou popsané v `.env.example`. Soubor `.env` se záměrně nenačít
 | `OPENAI_API_KEY` | volitelná serverová AI analýza | prázdná |
 | `OPENAI_MODEL` | obrazový model | `gpt-4.1-mini` |
 | `FORMA_AI_DAILY_LIMIT` | AI volání na účet za UTC den | `10` |
+| `FORMA_MAX_ACCOUNTS` | maximální počet registrací; `0` = bez limitu | `0` |
+| `FORMA_MAX_PHOTO_MB_PER_ACCOUNT` | limit fotografií jednoho účtu | `100` |
+| `FORMA_MAX_TOTAL_PHOTO_MB` | celkový limit fotografií; `0` = bez limitu | `0` |
+| `FORMA_WRITE_RATE_PER_MINUTE` | zápisové požadavky na účet za minutu | `240` |
 
 Tajné hodnoty nikdy neukládej do GitHubu, frontendových souborů ani chatu.
 
@@ -104,7 +108,9 @@ Produkce potřebuje HTTPS reverse proxy, trvalý disk `/data`, pravidelné SQLit
 2. Přihlas se přes GitHub a potvrď Blueprint.
 3. Po dokončení buildu otevři URL končící `.onrender.com`.
 
-Render předá aplikaci svou doménu přes `RENDER_EXTERNAL_HOSTNAME`, takže bezpečné cookies, HSTS a kontrola Origin se zapnou automaticky. Pro dlouhodobé používání změň plán na variantu s persistentním diskem připojeným na `/data`.
+Render předá aplikaci svou doménu přes `RENDER_EXTERNAL_HOSTNAME`, takže bezpečné cookies, HSTS a kontrola Origin se zapnou automaticky. Trvalé uchování dat by vyžadovalo persistentní disk; ten záměrně není součástí bezplatné konfigurace.
+
+Blueprint je záměrně nastaven na `plan: free`, nemá databázi, placený disk ani API klíč a automatické deploye jsou vypnuté. Bezplatný náhled proto používá dočasné úložiště: po restartu nebo uspání mohou účty i data zmizet. Při potvrzení nasazení pokračuj pouze tehdy, když Render ukazuje cenu **0 USD**; nepřidávej disk, databázi ani placený typ instance. Samotný repozitář nemůže ovládat fakturační nastavení účtu Render ani zabránit ručnímu upgradu služby.
 
 ## Zabezpečení a soukromí
 
