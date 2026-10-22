@@ -4,6 +4,7 @@ import io
 import importlib.util
 import json
 import os
+import sqlite3
 import tempfile
 import threading
 import time
@@ -110,6 +111,26 @@ class FormaIntegration(unittest.TestCase):
   self.assertEqual(self.req(a,'exercise',{'name':"Bench '); DROP TABLE users;--",'plan':'Test'})[0],200)
   self.assertEqual(self.req(a,'state')[0],200)
   self.assertEqual(self.req(a,'analyze',{'photo_id':str(uuid.uuid4())})[0],503)
+ def test_workout_priority_and_exercise_order_are_owned_and_persisted(self):
+  a,b=self.account('Plánovač'),self.account('Cizí plán')
+  self.assertEqual(self.req(a,'template',{})[0],200)
+  self.assertEqual(self.req(b,'template',{})[0],200)
+  own=self.req(a,'state')[1]['exercises']
+  foreign=self.req(b,'state')[1]['exercises'][0]
+  upper=[e['id'] for e in own if e['plan']=='Upper'][:3]
+  wid=str(uuid.uuid4())
+  status,workout=self.req(a,'workout',{'id':wid,'name':'Upper','priority':'back','exercise_order':upper})
+  self.assertEqual(status,200)
+  self.assertEqual(workout['priority'],'back')
+  self.assertEqual(workout['exercise_order'],upper)
+  saved=next(w for w in self.req(a,'state')[1]['workouts'] if w['id']==wid)
+  self.assertEqual(saved['priority'],'back')
+  self.assertEqual(saved['exercise_order'],upper)
+  self.assertEqual(self.req(a,'workout',{'id':str(uuid.uuid4()),'name':'Upper','priority':'unknown','exercise_order':upper})[0],400)
+  self.assertEqual(self.req(a,'workout',{'id':str(uuid.uuid4()),'name':'Upper','priority':'chest','exercise_order':[foreign['id']]})[0],404)
+  lower=next(e['id'] for e in own if e['plan']=='Lower')
+  self.assertEqual(self.req(a,'workout',{'id':str(uuid.uuid4()),'name':'Upper','priority':'chest','exercise_order':[lower]})[0],400)
+  self.assertEqual(self.req(a,'workout',{'id':str(uuid.uuid4()),'name':'Upper','priority':'chest','exercise_order':[upper[0],upper[0]]})[0],400)
  def test_private_photos(self):
   a,b=self.account('Foto'),self.account('Cizí')
   boundary='forma-boundary';image=b'\xff\xd8\xff'+b'fake-test-jpeg'
@@ -119,5 +140,19 @@ class FormaIntegration(unittest.TestCase):
   with a.open(self.origin+'/api/photo/'+photo) as response: self.assertEqual(response.read(),image)
   self.assertEqual(self.req(b,'photo/'+photo)[0],404)
   self.assertEqual(self.req(b,'meal',{'day':'2026-10-21','name':'Cizí fotka','kcal':1,'photo_id':photo})[0],404)
+
+class SchemaMigration(unittest.TestCase):
+ def test_initialize_adds_planner_columns_to_v1_database(self):
+  original=server.DATA
+  with tempfile.TemporaryDirectory() as folder:
+   server.DATA=Path(folder)
+   with sqlite3.connect(str(server.DATA/'forma.sqlite3')) as con:
+    con.execute('CREATE TABLE workouts(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,name TEXT NOT NULL,started INTEGER NOT NULL,ended INTEGER,shared INTEGER NOT NULL DEFAULT 0)')
+   server.initialize()
+   with server.db() as con:
+    columns={row['name'] for row in con.execute('PRAGMA table_info(workouts)')}
+   self.assertIn('priority',columns)
+   self.assertIn('exercise_order',columns)
+  server.DATA=original
 
 if __name__=='__main__': unittest.main()
